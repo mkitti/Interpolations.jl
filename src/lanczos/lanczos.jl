@@ -60,25 +60,32 @@ end
 function positions(it::Lanczos{N}, ax, x) where N
     xf = floorbounds(x, ax)
     δx = x - xf
-    fast_trunc(Int, xf) - degree(it) + 1, δx
+    fast_trunc(Int, xf) - degree(it), δx
 end
 
 function value_weights(it::Lanczos, δx::S) where S
     N = degree(it)
     # short-circuit if integral
-    isinteger(δx) && return ntuple(i->convert(float(S), i == N - δx), Val(2N))
+    isinteger(δx) && return ntuple(i->convert(float(S), i == N - δx + 1), Val(2N+1))
 
     # LUTs
-    it.a === N === 4 && return _lanczos4(δx)
+    #it.a === N === 4 && return _lanczos4(δx)
 
-    cs = ntuple(i -> lanczos(N - i + δx, it.a, N), Val(2N))
-    normed_cs = ntuple(i -> cs[i] / sum(cs), Val(length(cs)))
+    # always evaluate for a positive shift for consistency
+    aδx = abs(δx)
+    cs = ntuple(i -> lanczos(N - i + aδx + 1, it.a, N), Val(2N+1))
+    cs_sum = sum(cs)
+    # reverse weights if there is a negative shift
+    if(δx < 0)
+        cs = reverse(cs)
+    end
+    normed_cs = ntuple(i -> cs[i] / cs_sum, Val(length(cs)))
     return normed_cs
 end
 
 function padded_axis(ax::AbstractUnitRange, it::Lanczos)
     N = degree(it)
-    return first(ax) - N + 1:last(ax) + N
+    return first(ax) - N:last(ax) + N
 end
 
 # precise implementations for fast evaluation of common kernels
